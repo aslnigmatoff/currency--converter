@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Конвертер валют (исправленный)</title>
+  <title>Конвертер валют</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 600px;
+      max-width: 500px;
       margin: 0 auto;
       padding: 20px;
     }
-    .converter-box {
+    .converter {
       border: 1px solid #ddd;
-      border-radius: 8px;
       padding: 20px;
+      border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     .input-group {
-      margin: 15px 0;
+      margin-bottom: 15px;
     }
     input, select, button {
       padding: 10px;
@@ -27,16 +27,19 @@
       border-radius: 4px;
     }
     input {
-      width: 200px;
+      width: 100%;
+      box-sizing: border-box;
     }
     select {
-      width: 150px;
+      width: 48%;
     }
     button {
       background-color: #4CAF50;
       color: white;
+      border: none;
       cursor: pointer;
-      transition: background-color 0.3s;
+      width: 100%;
+      margin-top: 10px;
     }
     button:hover {
       background-color: #45a049;
@@ -46,10 +49,9 @@
       cursor: not-allowed;
     }
     #result {
-      margin: 20px 0;
-      padding: 15px;
+      margin-top: 20px;
+      padding: 10px;
       border-radius: 4px;
-      font-size: 18px;
     }
     .success {
       background-color: #dff0d8;
@@ -75,140 +77,100 @@
   </style>
 </head>
 <body>
-  <div class="converter-box">
+  <div class="converter">
     <h1>Конвертер валют</h1>
     
     <div class="input-group">
-      <input type="number" id="amount" placeholder="Сумма" min="0.01" step="0.01">
+      <input type="number" id="amount" placeholder="Введите сумму" min="0.01" step="0.01">
     </div>
     
     <div class="input-group">
       <select id="from">
-        <option value="USD">USD (Доллар США)</option>
+        <option value="USD">USD (Доллар)</option>
         <option value="EUR">EUR (Евро)</option>
         <option value="RUB">RUB (Рубль)</option>
-        <option value="UZS">UZS (Узбекский сум)</option>
-        <option value="KZT">KZT (Тенге)</option>
+        <option value="UZS">UZS (Сум)</option>
       </select>
       <span> → </span>
       <select id="to">
         <option value="EUR">EUR (Евро)</option>
-        <option value="USD">USD (Доллар США)</option>
+        <option value="USD">USD (Доллар)</option>
         <option value="RUB">RUB (Рубль)</option>
-        <option value="UZS">UZS (Узбекский сум)</option>
-        <option value="KZT">KZT (Тенге)</option>
+        <option value="UZS">UZS (Сум)</option>
       </select>
     </div>
     
-    <button id="convertBtn" onclick="convertCurrency()">Конвертировать</button>
+    <button id="convertBtn">Конвертировать</button>
     
     <div id="result"></div>
   </div>
 
   <script>
-    // Основные переменные
-    const apiUrl = 'https://api.exchangerate.host';
-    let isLoading = false;
-    
-    // Основная функция конвертации
-    async function convertCurrency() {
-      if (isLoading) return;
-      
-      const amount = parseFloat(document.getElementById('amount').value);
-      const fromCurrency = document.getElementById('from').value;
-      const toCurrency = document.getElementById('to').value;
-      const resultDiv = document.getElementById('result');
+    document.addEventListener('DOMContentLoaded', function() {
       const convertBtn = document.getElementById('convertBtn');
+      const amountInput = document.getElementById('amount');
+      const fromSelect = document.getElementById('from');
+      const toSelect = document.getElementById('to');
+      const resultDiv = document.getElementById('result');
       
-      // Валидация ввода
-      if (isNaN(amount) || amount <= 0) {
-        showResult('Введите корректную сумму (больше 0)', 'error');
-        return;
-      }
+      // Используем более надежный API
+      const API_URL = 'https://api.frankfurter.app';
       
-      // Блокируем кнопку на время запроса
-      isLoading = true;
-      convertBtn.disabled = true;
-      showResult('<span class="loading"></span> Загрузка курса...', '');
-      
-      try {
-        // Пробуем получить курс из localStorage (если не старше 1 часа)
-        const cachedRate = getCachedRate(fromCurrency, toCurrency);
-        if (cachedRate) {
-          const convertedAmount = (amount * cachedRate).toFixed(2);
-          showResult(`${amount} ${fromCurrency} = ${convertedAmount} ${toCurrency}`, 'success');
-          saveToHistory(amount, fromCurrency, convertedAmount, toCurrency);
+      convertBtn.addEventListener('click', async function() {
+        const amount = parseFloat(amountInput.value);
+        const from = fromSelect.value;
+        const to = toSelect.value;
+        
+        // Валидация ввода
+        if (isNaN(amount) || amount <= 0) {
+          showResult('Введите корректную сумму (больше 0)', 'error');
           return;
         }
         
-        // Если нет в кэше, делаем запрос к API
-        const response = await fetch(`${apiUrl}/convert?from=${fromCurrency}&to=${toCurrency}&amount=${amount}`);
+        // Блокируем кнопку на время запроса
+        convertBtn.disabled = true;
+        showResult('<span class="loading"></span> Получаем курс...', '');
         
-        if (!response.ok) {
-          throw new Error(`Ошибка HTTP: ${response.status}`);
+        try {
+          // Пробуем получить курс
+          const response = await fetch(`${API_URL}/latest?from=${from}&to=${to}`);
+          
+          if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (!data.rates || !data.rates[to]) {
+            throw new Error('Не удалось получить курс');
+          }
+          
+          const rate = data.rates[to];
+          const convertedAmount = (amount * rate).toFixed(2);
+          
+          showResult(
+            `${amount} ${from} = ${convertedAmount} ${to}<br>
+            <small>Курс: 1 ${from} = ${rate.toFixed(6)} ${to}</small>`,
+            'success'
+          );
+          
+        } catch (error) {
+          console.error('Ошибка:', error);
+          showResult(
+            `Ошибка: ${error.message || 'Не удалось получить курс'}<br>
+            <small>Попробуйте позже или выберите другие валюты</small>`,
+            'error'
+          );
+        } finally {
+          convertBtn.disabled = false;
         }
-        
-        const data = await response.json();
-        
-        if (!data.success || !data.result) {
-          throw new Error('Не удалось получить курс');
-        }
-        
-        // Сохраняем курс в кэш
-        cacheRate(fromCurrency, toCurrency, data.result / amount);
-        
-        // Показываем результат
-        const convertedAmount = data.result.toFixed(2);
-        showResult(`${amount} ${fromCurrency} = ${convertedAmount} ${toCurrency}`, 'success');
-        saveToHistory(amount, fromCurrency, convertedAmount, toCurrency);
-        
-      } catch (error) {
-        console.error('Ошибка конвертации:', error);
-        showResult(`Ошибка: ${error.message || 'Не удалось получить курс'}`, 'error');
-      } finally {
-        isLoading = false;
-        convertBtn.disabled = false;
+      });
+      
+      function showResult(message, type) {
+        resultDiv.innerHTML = message;
+        resultDiv.className = type;
       }
-    }
-    
-    // Функции для работы с кэшем
-    function getCachedRate(from, to) {
-      const cacheKey = `rate_${from}_${to}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      
-      if (!cachedData) return null;
-      
-      const { rate, timestamp } = JSON.parse(cachedData);
-      
-      // Проверяем, что данные не старше 1 часа (3600000 мс)
-      if (Date.now() - timestamp < 3600000) {
-        return rate;
-      }
-      
-      return null;
-    }
-    
-    function cacheRate(from, to, rate) {
-      const cacheKey = `rate_${from}_${to}`;
-      const cacheData = {
-        rate: rate,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    }
-    
-    // Функции для отображения результата
-    function showResult(message, type) {
-      const resultDiv = document.getElementById('result');
-      resultDiv.innerHTML = message;
-      resultDiv.className = type;
-    }
-    
-    // Функция для сохранения истории (можно расширить)
-    function saveToHistory(amount, from, convertedAmount, to) {
-      // Здесь можно добавить сохранение в localStorage
-      console.log(`Сохранено в историю: ${amount} ${from} → ${convertedAmount} ${to}`);
-    }
+    });
   </script>
 </body>
 </html>
