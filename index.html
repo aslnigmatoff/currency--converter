@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Конвертер валют</title>
+  <title>Конвертер валют с CNY</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -88,6 +88,7 @@
       <select id="from">
         <option value="USD">USD (Доллар)</option>
         <option value="EUR">EUR (Евро)</option>
+        <option value="CNY">CNY (Юань)</option>
         <option value="RUB">RUB (Рубль)</option>
         <option value="KZT">KZT (Тенге)</option>
       </select>
@@ -95,6 +96,7 @@
       <select id="to">
         <option value="EUR">EUR (Евро)</option>
         <option value="USD">USD (Доллар)</option>
+        <option value="CNY">CNY (Юань)</option>
         <option value="RUB">RUB (Рубль)</option>
         <option value="KZT">KZT (Тенге)</option>
       </select>
@@ -113,11 +115,11 @@
       const toSelect = document.getElementById('to');
       const resultDiv = document.getElementById('result');
       
-      // Используем два API для надежности
-      const API_URLS = [
-        'https://api.frankfurter.app',
-        'https://api.exchangerate-api.com/v4/latest'
-      ];
+      // Основной API с поддержкой CNY
+      const API_URL = 'https://api.exchangerate-api.com/v4/latest';
+      
+      // Фолбэк API
+      const FALLBACK_API = 'https://api.frankfurter.app';
       
       convertBtn.addEventListener('click', async function() {
         const amount = parseFloat(amountInput.value);
@@ -138,12 +140,16 @@
         showResult('<span class="loading"></span> Получаем курс...', '');
         
         try {
-          // Пробуем оба API последовательно
-          const convertedAmount = await tryConvert(API_URLS[0], amount, from, to) || 
-                                 await tryConvert(API_URLS[1], amount, from, to);
+          // Сначала пробуем основной API
+          let convertedAmount = await tryConvert(API_URL, amount, from, to);
+          
+          // Если не получилось, пробуем фолбэк API
+          if (!convertedAmount && from !== 'CNY' && to !== 'CNY') {
+            convertedAmount = await tryConvert(FALLBACK_API, amount, from, to);
+          }
           
           if (!convertedAmount) {
-            throw new Error('Не удалось получить курс');
+            throw new Error('Не удалось получить курс для выбранных валют');
           }
           
           showResult(
@@ -155,7 +161,7 @@
           console.error('Ошибка:', error);
           showResult(
             `Ошибка: ${error.message || 'Сервис временно недоступен'}<br>
-            <small>Попробуйте позже</small>`,
+            <small>Попробуйте другие валюты или повторите позже</small>`,
             'error'
           );
         } finally {
@@ -165,17 +171,32 @@
       
       async function tryConvert(apiUrl, amount, from, to) {
         try {
-          const response = await fetch(`${apiUrl}/latest?from=${from}&to=${to}`);
+          let url, ratePath;
+          
+          if (apiUrl.includes('exchangerate-api')) {
+            // Для exchangerate-api.com
+            url = `${apiUrl}/${from}`;
+            ratePath = `data.rates[to]`;
+          } else {
+            // Для frankfurter.app
+            url = `${apiUrl}/latest?from=${from}`;
+            ratePath = `data.rates[to]`;
+          }
+          
+          const response = await fetch(url);
           
           if (!response.ok) throw new Error('API не ответил');
           
           const data = await response.json();
           
-          if (!data.rates || !data.rates[to]) {
+          // Динамическое получение курса по пути
+          const rate = eval(ratePath);
+          
+          if (!rate) {
             throw new Error('Нет данных о курсе');
           }
           
-          return (amount * data.rates[to]).toFixed(2);
+          return (amount * rate).toFixed(2);
         } catch (error) {
           console.warn(`Ошибка в ${apiUrl}:`, error);
           return null;
