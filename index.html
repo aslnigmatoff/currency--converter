@@ -89,14 +89,14 @@
         <option value="USD">USD (Доллар)</option>
         <option value="EUR">EUR (Евро)</option>
         <option value="RUB">RUB (Рубль)</option>
-        <option value="UZS">UZS (Сум)</option>
+        <option value="KZT">KZT (Тенге)</option>
       </select>
       <span> → </span>
       <select id="to">
         <option value="EUR">EUR (Евро)</option>
         <option value="USD">USD (Доллар)</option>
         <option value="RUB">RUB (Рубль)</option>
-        <option value="UZS">UZS (Сум)</option>
+        <option value="KZT">KZT (Тенге)</option>
       </select>
     </div>
     
@@ -113,58 +113,74 @@
       const toSelect = document.getElementById('to');
       const resultDiv = document.getElementById('result');
       
-      // Используем более надежный API
-      const API_URL = 'https://api.frankfurter.app';
+      // Используем два API для надежности
+      const API_URLS = [
+        'https://api.frankfurter.app',
+        'https://api.exchangerate-api.com/v4/latest'
+      ];
       
       convertBtn.addEventListener('click', async function() {
         const amount = parseFloat(amountInput.value);
         const from = fromSelect.value;
         const to = toSelect.value;
         
-        // Валидация ввода
         if (isNaN(amount) || amount <= 0) {
           showResult('Введите корректную сумму (больше 0)', 'error');
           return;
         }
         
-        // Блокируем кнопку на время запроса
+        if (from === to) {
+          showResult('Выберите разные валюты', 'error');
+          return;
+        }
+        
         convertBtn.disabled = true;
         showResult('<span class="loading"></span> Получаем курс...', '');
         
         try {
-          // Пробуем получить курс
-          const response = await fetch(`${API_URL}/latest?from=${from}&to=${to}`);
+          // Пробуем оба API последовательно
+          const convertedAmount = await tryConvert(API_URLS[0], amount, from, to) || 
+                                 await tryConvert(API_URLS[1], amount, from, to);
           
-          if (!response.ok) {
-            throw new Error(`Ошибка сервера: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          if (!data.rates || !data.rates[to]) {
+          if (!convertedAmount) {
             throw new Error('Не удалось получить курс');
           }
           
-          const rate = data.rates[to];
-          const convertedAmount = (amount * rate).toFixed(2);
-          
           showResult(
-            `${amount} ${from} = ${convertedAmount} ${to}<br>
-            <small>Курс: 1 ${from} = ${rate.toFixed(6)} ${to}</small>`,
+            `${amount} ${from} = ${convertedAmount} ${to}`,
             'success'
           );
           
         } catch (error) {
           console.error('Ошибка:', error);
           showResult(
-            `Ошибка: ${error.message || 'Не удалось получить курс'}<br>
-            <small>Попробуйте позже или выберите другие валюты</small>`,
+            `Ошибка: ${error.message || 'Сервис временно недоступен'}<br>
+            <small>Попробуйте позже</small>`,
             'error'
           );
         } finally {
           convertBtn.disabled = false;
         }
       });
+      
+      async function tryConvert(apiUrl, amount, from, to) {
+        try {
+          const response = await fetch(`${apiUrl}/latest?from=${from}&to=${to}`);
+          
+          if (!response.ok) throw new Error('API не ответил');
+          
+          const data = await response.json();
+          
+          if (!data.rates || !data.rates[to]) {
+            throw new Error('Нет данных о курсе');
+          }
+          
+          return (amount * data.rates[to]).toFixed(2);
+        } catch (error) {
+          console.warn(`Ошибка в ${apiUrl}:`, error);
+          return null;
+        }
+      }
       
       function showResult(message, type) {
         resultDiv.innerHTML = message;
