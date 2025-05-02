@@ -1,215 +1,82 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Конвертер валют с CNY</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .converter {
-      border: 1px solid #ddd;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .input-group {
-      margin-bottom: 15px;
-    }
-    input, select, button {
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    input {
-      width: 100%;
-      box-sizing: border-box;
-    }
-    select {
-      width: 48%;
-    }
-    button {
-      color: white;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 10px;
-    }
-    #convertBtn {
-      background-color: #4CAF50;
-    }
-    #convertBtn:hover {
-      background-color: #45a049;
-    }
-    #reverseBtn {
-      background-color: #2196F3;
-    }
-    #reverseBtn:hover {
-      background-color: #0b7dda;
-    }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
-    #result {
-      margin-top: 20px;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .success {
-      background-color: #dff0d8;
-      color: #3c763d;
-    }
-    .error {
-      background-color: #f2dede;
-      color: #a94442;
-    }
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(0,0,0,.3);
-      border-radius: 50%;
-      border-top-color: #000;
-      animation: spin 1s ease-in-out infinite;
-      margin-right: 10px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
-</head>
-<body>
-  <div class="converter">
-    <h1>Конвертер валют</h1>
-    
-    <div class="input-group">
-      <input type="number" id="amount" placeholder="Введите сумму" min="0.01" step="0.01">
-    </div>
-    
-    <div class="input-group">
-      <select id="from">
-        <option value="USD">USD (Доллар)</option>
-        <option value="EUR">EUR (Евро)</option>
-        <option value="CNY">CNY (Юань)</option>
-        <option value="RUB">RUB (Рубль)</option>
-        <option value="KZT">KZT (Тенге)</option>
-      </select>
-      <span> → </span>
-      <select id="to">
-        <option value="EUR">EUR (Евро)</option>
-        <option value="USD">USD (Доллар)</option>
-        <option value="CNY">CNY (Юань)</option>
-        <option value="RUB">RUB (Рубль)</option>
-        <option value="KZT">KZT (Тенге)</option>
-      </select>
-    </div>
-    
-    <button id="convertBtn">Конвертировать</button>
-    <button id="reverseBtn">↔ Обменять местами</button>
-    
-    <div id="result"></div>
-  </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const convertBtn = document.getElementById('convertBtn');
+    const reverseBtn = document.getElementById('reverseBtn');
+    const amountInput = document.getElementById('amount');
+    const fromSelect = document.getElementById('from');
+    const toSelect = document.getElementById('to');
+    const resultDiv = document.getElementById('result');
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const convertBtn = document.getElementById('convertBtn');
-      const reverseBtn = document.getElementById('reverseBtn');
-      const amountInput = document.getElementById('amount');
-      const fromSelect = document.getElementById('from');
-      const toSelect = document.getElementById('to');
-      const resultDiv = document.getElementById('result');
-      
-      // Основной API
-      const API_URL = 'https://api.exchangerate.host/latest';
-      
-      // Функция конвертации
-      async function convertCurrency() {
-        const amount = parseFloat(amountInput.value);
-        const from = fromSelect.value;
-        const to = toSelect.value;
-        
-        if (isNaN(amount) || amount <= 0) {
-          showResult('Введите корректную сумму (больше 0)', 'error');
-          return;
-        }
-        
-        if (from === to) {
-          showResult(`${amount} ${from} = ${amount} ${to}<br><small>Курс: 1 ${from} = 1 ${to}</small>`, 'success');
-          return;
-        }
-        
-        convertBtn.disabled = true;
-        showResult('<span class="loading"></span> Получаем курс...', '');
-        
-        try {
-          const response = await fetch(`${API_URL}?base=${from}&symbols=${to}`);
-          
-          if (!response.ok) {
-            throw new Error('Ошибка сервера: ' + response.status);
-          }
-          
-          const data = await response.json();
-          
-          if (!data.success && data.success !== undefined) {
-            throw new Error('API вернул ошибку');
-          }
-          
-          if (!data.rates || !data.rates[to]) {
-            throw new Error('Курс для выбранных валют не найден');
-          }
-          
-          const rate = data.rates[to];
-          const convertedAmount = (amount * rate).toFixed(2);
-          
-          showResult(
-            `${amount} ${from} = ${convertedAmount} ${to}<br>
-            <small>Курс: 1 ${from} = ${rate.toFixed(6)} ${to}</small>`,
-            'success'
-          );
-          
-        } catch (error) {
-          console.error('Ошибка конвертации:', error);
-          showResult(
-            `Ошибка: ${error.message || 'Не удалось получить курс'}<br>
-            <small>Попробуйте позже</small>`,
-            'error'
-          );
-        } finally {
-          convertBtn.disabled = false;
-        }
+    const API_URL = 'https://open.er-api.com/v6/latest';
+
+    async function convertCurrency() {
+      const amount = parseFloat(amountInput.value);
+      const from = fromSelect.value;
+      const to = toSelect.value;
+
+      if (isNaN(amount) || amount <= 0) {
+        showResult('Введите корректную сумму (больше 0)', 'error');
+        return;
       }
-      
-      // Функция обмена валют местами
-      function swapCurrencies() {
-        const fromValue = fromSelect.value;
-        const toValue = toSelect.value;
-        
-        // Обмен значениями
-        fromSelect.value = toValue;
-        toSelect.value = fromValue;
-        
-        // Если есть введенная сумма, делаем автоматическую конвертацию
-        if (amountInput.value && parseFloat(amountInput.value) > 0) {
-          convertCurrency();
+
+      if (from === to) {
+        showResult(`${amount} ${from} = ${amount} ${to}<br><small>Курс: 1 ${from} = 1 ${to}</small>`, 'success');
+        return;
+      }
+
+      convertBtn.disabled = true;
+      showResult('<span class="loading"></span> Получаем курс...', '');
+
+      try {
+        const response = await fetch(`${API_URL}/${from}?_=${Date.now()}`);
+        if (!response.ok) {
+          throw new Error('Ошибка сервера: ' + response.status);
         }
+
+        const data = await response.json();
+
+        if (data.result !== 'success' || !data.rates[to]) {
+          throw new Error('Курс для выбранных валют не найден');
+        }
+
+        const rate = data.rates[to];
+        const convertedAmount = (amount * rate).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        showResult(
+          `${amount} ${from} = ${convertedAmount} ${to}<br>
+          <small>Курс: 1 ${from} = ${rate.toFixed(6)} ${to}<br>
+          Обновлено: ${data.time_last_update_utc}</small>`,
+          'success'
+        );
+      } catch (error) {
+        console.error('Ошибка конвертации:', error);
+        showResult(
+          `Ошибка: ${error.message || 'Не удалось получить курс'}<br><small>Попробуйте позже</small>`,
+          'error'
+        );
+      } finally {
+        convertBtn.disabled = false;
       }
-      
-      // Назначение обработчиков событий
-      convertBtn.addEventListener('click', convertCurrency);
-      reverseBtn.addEventListener('click', swapCurrencies);
-      
-      // Функция отображения результата
-      function showResult(message, type) {
-        resultDiv.innerHTML = message;
-        resultDiv.className = type;
+    }
+
+    function swapCurrencies() {
+      const fromValue = fromSelect.value;
+      const toValue = toSelect.value;
+
+      fromSelect.value = toValue;
+      toSelect.value = fromValue;
+
+      if (amountInput.value && parseFloat(amountInput.value) > 0) {
+        convertCurrency();
       }
-    });
-  </script>
-</body>
-</html>
+    }
+
+    convertBtn.addEventListener('click', convertCurrency);
+    reverseBtn.addEventListener('click', swapCurrencies);
+
+    function showResult(message, type) {
+      resultDiv.innerHTML = message;
+      resultDiv.className = type;
+    }
+  });
+</script>
